@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Tableau Chatbot</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- DataTables CSS & JS -->
+  <link rel="stylesheet" href="https://cdn.datatables.net/v/bs4/dt-1.10.18/datatables.min.css">
+  <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+  <script src="https://cdn.datatables.net/v/bs4/dt-1.10.18/datatables.min.js"></script>
+
+  <!-- Tableau Extensions -->
+  <!-- <script src="/lib/tableau.extensions.1.latest.js"></script> -->
+    <script src="/static/lib/tableau.extensions.1.latest.js"></script>
+
+
+  <!-- Styles -->
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #e0f7fa, #e1bee7);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .chat-container {
+      width: 90%;
+      max-width: 600px;
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .chat-header {
+      font-size: 1.4rem;
+      font-weight: bold;
+      margin-bottom: 10px;
+      color: #673ab7;
+    }
+
+    #worksheet_names {
+      font-size: 0.95rem;
+      color: #555;
+      margin-bottom: 10px;
+    }
+
+    #chat_box {
+      flex: 1;
+      height: 400px;
+      overflow-y: auto;
+      border: 1px solid #ddd;
+      padding: 10px;
+      border-radius: 10px;
+      background: #f9f9f9;
+      margin-bottom: 15px;
+      scroll-behavior: smooth;
+    }
+
+    .chat-input {
+      display: flex;
+      gap: 10px;
+    }
+
+    #user_input {
+      flex: 1;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 1rem;
+    }
+
+    #send_button {
+      background-color: #7e57c2;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    #send_button:hover {
+      background-color: #5e35b1;
+    }
+
+    .user-msg, .ai-msg {
+      padding: 10px;
+      margin-bottom: 8px;
+      border-radius: 8px;
+      max-width: 80%;
+    }
+
+    .user-msg {
+      background-color: #c5cae9;
+      align-self: flex-end;
+      text-align: right;
+    }
+
+    .ai-msg {
+      background-color: #b2dfdb;
+      align-self: flex-start;
+      text-align: left;
+    }
+
+    @media (max-width: 480px) {
+      .chat-container {
+        padding: 10px;
+        border-radius: 12px;
+      }
+
+      #chat_box {
+        height: 300px;
+      }
+
+      #send_button {
+        padding: 8px 12px;
+        font-size: 0.9rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="chat-container">
+    <div class="chat-header">🤖 Tableau Chatbot</div>
+    <!-- <div id="worksheet_names">Loading worksheets...</div> -->
+    <div id="chat_box"></div>
+    <div class="chat-input">
+      <input type="text" id="user_input" placeholder="Ask me something about the dashboard..." />
+      <button id="send_button">Send</button>
+    </div>
+  </div>
+
+  <!-- Script -->
+<script>
+  let worksheetData = null;
+  let dashboardName = null;
+
+  $(document).ready(function () {
+    tableau.extensions.initializeAsync().then(() => {
+      const dashboard = tableau.extensions.dashboardContent.dashboard;
+      dashboardName = dashboard.name;
+      const worksheets = dashboard.worksheets;
+
+      const worksheetNames = worksheets.map(ws => ws.name);
+      $('#worksheet_names').text("Worksheets: " + worksheetNames.join(", "));
+
+      // Fetch data from all worksheets
+      Promise.all(
+        worksheets.map(worksheet =>
+          worksheet.getSummaryDataAsync().then(dataTable => ({
+            worksheet: worksheet.name,
+            columns: dataTable.columns.map(col => col.fieldName),
+            data: dataTable.data.map(row => row.map(cell => cell.formattedValue))
+          }))
+        )
+      ).then(results => {
+        worksheetData = results;
+
+        // Store data with dashboard name
+        fetch("http://localhost:5000/api/store_data", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ dashboard: dashboardName, data: worksheetData })
+        });
+      });
+
+      // Send message on button click
+      $('#send_button').on('click', sendMessage);
+
+      // Send message on Enter key press
+      $('#user_input').keypress(function (e) {
+        if (e.which === 13 && !e.shiftKey) {
+          e.preventDefault();
+          sendMessage();
+        }
+      });
+    });
+
+    function sendMessage() {
+      const question = $('#user_input').val().trim();
+      if (!question || !dashboardName) return;
+
+      $('#chat_box').append(`<div class="user-msg">${question}</div>`);
+      $('#user_input').val('');
+
+      fetch("http://localhost:5000/api/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dashboard: dashboardName, question: question })
+      })
+        .then(res => res.json())
+        .then(data => {
+          $('#chat_box').append(`<div class="ai-msg">${data.answer || data.error}</div>`);
+          $('#chat_box').scrollTop($('#chat_box')[0].scrollHeight);
+        })
+        .catch(error => {
+          $('#chat_box').append(`<div class="ai-msg">Error: ${error.message}</div>`);
+        });
+    }
+  });
+</script>
+
+</body>
+</html>
