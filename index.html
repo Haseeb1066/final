@@ -169,7 +169,7 @@
         worksheetData = results;
 
         // Store data with dashboard name
-        fetch("http://localhost:5000/api/store_data", {
+        fetch("https://final-7wmf.onrender.com/api/store_data", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ dashboard: dashboardName, data: worksheetData })
@@ -195,7 +195,7 @@
       $('#chat_box').append(`<div class="user-msg">${question}</div>`);
       $('#user_input').val('');
 
-      fetch("http://localhost:5000/api/ask", {
+      fetch("https://final-7wmf.onrender.com/api/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ dashboard: dashboardName, question: question })
