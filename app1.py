@@ -8,9 +8,9 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-api_key = os.getenv("OPENAI_API_KEY")
-client = OpenAI(api_key=api_key)
-
+# api_key = os.getenv("OPENAI_API_KEY")
+# client = OpenAI(api_key=api_key)
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 stored_data = None
 
 # A global dictionary to hold data by dashboard
@@ -83,4 +83,4 @@ def ask():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run()
