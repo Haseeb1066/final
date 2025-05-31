@@ -44,11 +44,12 @@
     }
 
     .chat-header {
-      font-size: 1.4rem;
-      font-weight: bold;
-      margin-bottom: 10px;
-      color: #673ab7;
-    }
+  font-size: 1.4rem;
+  font-weight: bold;
+  margin-bottom: 10px;
+  color: #673ab7;
+  font-family: "Bookman Old Style", serif;
+}
 
     #worksheet_names {
       font-size: 0.95rem;
@@ -128,12 +129,19 @@
         padding: 8px 12px;
         font-size: 0.9rem;
       }
+  .highlight {
+  font-weight: bold;
+  color: #6a1b9a;
+  background-color: #f3e5f5;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
     }
   </style>
 </head>
 <body>
   <div class="chat-container">
-    <div class="chat-header">🤖 Tableau Chatbot</div>
+    <div class="chat-header"> AI-sha </div>
     <!-- <div id="worksheet_names">Loading worksheets...</div> -->
     <div id="chat_box"></div>
     <div class="chat-input">
@@ -188,27 +196,77 @@
       });
     });
 
+    
     function sendMessage() {
-      const question = $('#user_input').val().trim();
-      if (!question || !dashboardName) return;
+  const question = $('#user_input').val().trim();
+  if (!question || !dashboardName) return;
 
-      $('#chat_box').append(`<div class="user-msg">${question}</div>`);
-      $('#user_input').val('');
+  $('#chat_box').append(`<div class="user-msg">${question}</div>`);
+  $('#user_input').val('');
 
-      fetch("https://final-7wmf.onrender.com/api/ask", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dashboard: dashboardName, question: question })
-      })
-        .then(res => res.json())
-        .then(data => {
-          $('#chat_box').append(`<div class="ai-msg">${data.answer || data.error}</div>`);
-          $('#chat_box').scrollTop($('#chat_box')[0].scrollHeight);
-        })
-        .catch(error => {
-          $('#chat_box').append(`<div class="ai-msg">Error: ${error.message}</div>`);
-        });
-    }
+  fetch("http://localhost:5000/api/ask", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ dashboard: dashboardName, question: question })
+  })
+    .then(res => res.json())
+    .then(data => {
+      const rawText = data.answer || data.error;
+      const formattedAnswer = formatAndHighlight(rawText);
+      $('#chat_box').append(`<div class="ai-msg">${formattedAnswer}</div>`);
+      $('#chat_box').scrollTop($('#chat_box')[0].scrollHeight);
+    })
+    .catch(error => {
+      $('#chat_box').append(`<div class="ai-msg">Error: ${error.message}</div>`);
+    });
+}
+function formatAndHighlight(text) {
+  const malls = [
+    "Sindh Lucky One Mall", "Punjab Fortress Square", "Punjab Emporium Mall",
+    "Sindh Dolmen Mall Clifton", "Sindh Boulevard Mall"
+  ];
+
+  const lines = text.split('\n').filter(line => line.trim() !== '');
+  const formattedLines = lines.map(line => {
+    // Highlight mall names
+    malls.forEach(mall => {
+      const regex = new RegExp(mall, 'gi');
+      line = line.replace(regex, `<span class="highlight">${mall}</span>`);
+    });
+
+    // Highlight dollar amounts and comma-separated numbers
+    line = line.replace(/\$\d{1,3}(?:,\d{3})*(?:\.\d+)?/g, '<span class="highlight">$&</span>');
+    line = line.replace(/\b\d{1,3}(?:,\d{3})+\b/g, '<span class="highlight">$&</span>');
+
+    return `<li>${line}</li>`;
+  });
+
+  return `<ul style="padding-left: 20px; margin: 0;">${formattedLines.join('')}</ul>`;
+}
+
+  });
+</script>
+<script>
+  function formatAndHighlight(text) {
+    // Replace newlines with <br>
+    text = text.replace(/\n/g, '<br>');
+
+    // Highlight currency and large numbers
+    text = text.replace(/\$\d{1,3}(?:,\d{3})+/g, '<span class="highlight">$&</span>');
+    text = text.replace(/\b\d{1,3}(?:,\d{3})+\b/g, '<span class="highlight">$&</span>');
+
+    // Highlight known mall names (add yours as needed)
+    const malls = [
+      "Sindh Lucky One Mall", "Punjab Fortress Square", "Punjab Emporium Mall",
+      "Sindh Dolmen Mall Clifton", "Sindh Boulevard Mall"
+    ];
+    malls.forEach(mall => {
+      const re = new RegExp(mall, 'g');
+      text = text.replace(re, `<span class="highlight">${mall}</span>`);
+    });
+
+    return text;
+  }
   });
 </script>
 
