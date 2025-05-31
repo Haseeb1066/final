@@ -69,7 +69,7 @@ def ask():
         prompt = f"The user has asked a question based on this data:\n{data}\n\nQuestion: {question}"
 
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4-turbo",
             messages=[
                 {"role": "system", "content": "You are a Tableau dashboard analyst."},
                 {"role": "user", "content": prompt}
