@@ -204,7 +204,7 @@
   $('#chat_box').append(`<div class="user-msg">${question}</div>`);
   $('#user_input').val('');
 
-  fetch("http://localhost:5000/api/ask", {
+  fetch("https://final-7wmf.onrender.com/api/ask", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ dashboard: dashboardName, question: question })
@@ -246,29 +246,7 @@ function formatAndHighlight(text) {
 
   });
 </script>
-<script>
-  function formatAndHighlight(text) {
-    // Replace newlines with <br>
-    text = text.replace(/\n/g, '<br>');
 
-    // Highlight currency and large numbers
-    text = text.replace(/\$\d{1,3}(?:,\d{3})+/g, '<span class="highlight">$&</span>');
-    text = text.replace(/\b\d{1,3}(?:,\d{3})+\b/g, '<span class="highlight">$&</span>');
-
-    // Highlight known mall names (add yours as needed)
-    const malls = [
-      "Sindh Lucky One Mall", "Punjab Fortress Square", "Punjab Emporium Mall",
-      "Sindh Dolmen Mall Clifton", "Sindh Boulevard Mall"
-    ];
-    malls.forEach(mall => {
-      const re = new RegExp(mall, 'g');
-      text = text.replace(re, `<span class="highlight">${mall}</span>`);
-    });
-
-    return text;
-  }
-  });
-</script>
 
 </body>
 </html>
