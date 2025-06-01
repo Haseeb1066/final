@@ -50,7 +50,7 @@ def ask():
 )
 
         response = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": "You are a Tableau dashboard analyst."},
                 {"role": "user", "content": prompt}
