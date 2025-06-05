@@ -9,12 +9,21 @@ app = Flask(__name__)
 CORS(app)
 
 # api_key = os.getenv("OPENAI_API_KEY")
-# client = OpenAI(api_key=api_key)
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
 stored_data = None
 
 # A global dictionary to hold data by dashboard
 dashboard_data_store = {}
+
+
+@app.route('/api/receiveData', methods=['POST'])
+def receive_data():
+    data = request.get_json()
+    # print("✅ Received Data:", data[:2])
+    return jsonify({"status": "success"}), 200
+
+
 
 @app.route("/api/store_data", methods=["POST"])
 def store_data():
@@ -22,6 +31,7 @@ def store_data():
     dashboard = content.get("dashboard")
     data = content.get("data")
     dashboard_data_store[dashboard] = data
+    # print(data [2])
     return jsonify({"status": "success"})
 
 
