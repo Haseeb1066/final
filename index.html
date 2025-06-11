@@ -11,18 +11,13 @@
   <script src="https://cdn.datatables.net/v/bs4/dt-1.10.18/datatables.min.js"></script>
 
   <!-- Tableau Extensions -->
-  <!-- <script src="/lib/tableau.extensions.1.latest.js"></script> -->
-  <script src="/static/lib/tableau.extensions.1.latest.js"></script>
+  <script src="/lib/tableau.extensions.1.latest.js"></script>
 
   <!-- Styles -->
   <style>
-    * {
-      box-sizing: border-box;
-    }
-
+    * { box-sizing: border-box; }
     body {
-      margin: 0;
-      padding: 0;
+      margin: 0; padding: 0;
       font-family: 'Segoe UI', sans-serif;
       background: linear-gradient(135deg, #e0f7fa, #e1bee7);
       display: flex;
@@ -30,10 +25,8 @@
       align-items: center;
       min-height: 100vh;
     }
-
     .chat-container {
-      width: 90%;
-      max-width: 600px;
+      width: 90%; max-width: 600px;
       background: white;
       border-radius: 16px;
       box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
@@ -41,7 +34,6 @@
       display: flex;
       flex-direction: column;
     }
-
     .chat-header {
       font-size: 1.4rem;
       font-weight: bold;
@@ -56,12 +48,6 @@
       padding: 2px 4px;
       border-radius: 4px;
     }
-    #worksheet_names {
-      font-size: 0.95rem;
-      color: #555;
-      margin-bottom: 10px;
-    }
-
     #chat_box {
       flex: 1;
       height: 400px;
@@ -73,12 +59,10 @@
       margin-bottom: 15px;
       scroll-behavior: smooth;
     }
-
     .chat-input {
       display: flex;
       gap: 10px;
     }
-
     #user_input {
       flex: 1;
       padding: 10px;
@@ -86,7 +70,6 @@
       border: 1px solid #ccc;
       font-size: 1rem;
     }
-
     #send_button {
       background-color: #7e57c2;
       color: white;
@@ -96,41 +79,49 @@
       cursor: pointer;
       transition: background-color 0.3s ease;
     }
-
+    #narrativeBtn {
+      background-color: #7e57c2;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
     #send_button:hover {
       background-color: #5e35b1;
     }
-
+    #narrativeBtn:hover {
+      background-color: #5e35b1;
+    }
     .user-msg, .ai-msg {
       padding: 10px;
       margin-bottom: 8px;
       border-radius: 8px;
       max-width: 80%;
     }
-
     .user-msg {
       background-color: #c5cae9;
       align-self: flex-end;
       text-align: right;
     }
-
     .ai-msg {
       background-color: #b2dfdb;
       align-self: flex-start;
       text-align: left;
     }
-
     @media (max-width: 480px) {
       .chat-container {
         padding: 10px;
         border-radius: 12px;
       }
-
-      #chat_box {
-        height: 300px;
-      }
-
+      #chat_box { height: 300px; }
       #send_button {
+        padding: 8px 12px;
+        font-size: 0.9rem;
+      }
+      #chat_box { height: 300px; }
+      #narrativeBtn {
         padding: 8px 12px;
         font-size: 0.9rem;
       }
@@ -139,148 +130,180 @@
 </head>
 <body>
   <div class="chat-container">
-    <div class="chat-header"> AIsha </div>
-    <!-- <div id="worksheet_names">Loading worksheets...</div> -->
+    <div class="chat-header">AIsha</div>
     <div id="chat_box"></div>
     <div class="chat-input">
       <input type="text" id="user_input" placeholder="Ask me something about the dashboard..." />
       <button id="send_button">Send</button>
+      <button id="narrativeBtn">Narrative</button>
+    <div id="narrativeOutput"></div>
+
     </div>
   </div>
+<script>
+'use strict';
+let worksheetData = null;
+let dashboardName = null;
+const unregisterHandlerFunctions = [];
 
-  <!-- Script -->
-  <script>
-    let worksheetData = null;
-    let dashboardName = null;
+$(document).ready(function () {
+  tableau.extensions.initializeAsync().then(async () => {
+    const dashboard = tableau.extensions.dashboardContent.dashboard;
+    dashboardName = dashboard.name;
+    const worksheets = dashboard.worksheets;
 
-    $(document).ready(function () {
-      tableau.extensions.initializeAsync().then(async () => {
-        const dashboard = tableau.extensions.dashboardContent.dashboard;
-        dashboardName = dashboard.name;
-        const worksheets = dashboard.worksheets;
+    // Initial data fetch and narrative
+    worksheetData = await fetchAllWorksheetData(worksheets);
+    await sendDataToAPI();
 
-        const worksheetNames = worksheets.map(ws => ws.name);
-        $('#worksheet_names').text("Worksheets: " + worksheetNames.join(", "));
-
-        // Fetch initial worksheet data
-        const initialData = await Promise.all(
-          worksheets.map(worksheet =>
-            worksheet.getSummaryDataAsync().then(dataTable => ({
-              worksheet: worksheet.name,
-              columns: dataTable.columns.map(col => col.fieldName),
-              data: dataTable.data.map(row => row.map(cell => cell.formattedValue))
-            }))
-          )
-        );
-
-        worksheetData = initialData;
-
-        // Send initial data to API
+    // Listen for parameter changes
+    (await dashboard.getParametersAsync()).forEach(param => {
+      param.addEventListener(tableau.TableauEventType.ParameterChanged, async () => {
+        worksheetData = await fetchAllWorksheetData(worksheets);
         await sendDataToAPI();
-
-        // Listen for parameter changes
-        const parameters = await dashboard.getParametersAsync();
-
-        parameters.forEach(param => {
-          param.addEventListener(tableau.TableauEventType.ParameterChanged, async () => {
-            console.log(`Parameter changed: ${param.name} => ${param.currentValue.formattedValue}`);
-
-            // Re-fetch updated worksheet data
-            const updatedData = await Promise.all(
-              worksheets.map(worksheet =>
-                worksheet.getSummaryDataAsync().then(dataTable => ({
-                  worksheet: worksheet.name,
-                  columns: dataTable.columns.map(col => col.fieldName),
-                  data: dataTable.data.map(row => row.map(cell => cell.formattedValue))
-                }))
-              )
-            );
-
-            worksheetData = updatedData;
-
-            // Send updated data to API
-            await sendDataToAPI();
-          });
-        });
-
-        // Send message on button click
-        $('#send_button').on('click', sendMessage);
-
-        // Send message on Enter key press
-        $('#user_input').keypress(function (e) {
-          if (e.which === 13 && !e.shiftKey) {
-            e.preventDefault();
-            sendMessage();
-          }
-        });
       });
+    });
 
-      async function sendDataToAPI() {
-        try {
-          const payload = { dashboard: dashboardName, data: worksheetData };
-          const response = await fetch("https://final-7wmf.onrender.com/api/store_data", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-          });
-          if (response.ok) {
-            console.log("✅ Data successfully sent to API");
-          } else {
-            console.error("❌ API error status:", response.status);
-          }
-        } catch (error) {
-          console.error("❌ Failed to send data:", error);
-        }
-      }
+    // Listen for filter changes
+    registerFilterListeners();
 
-      function sendMessage() {
-        const question = $('#user_input').val().trim();
-        if (!question || !dashboardName) return;
-
-        $('#chat_box').append(`<div class="user-msg">${question}</div>`);
-        $('#user_input').val('');
-
-        fetch("https://final-7wmf.onrender.com/api/ask", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ dashboard: dashboardName, question: question })
-        })
-          .then(res => res.json())
-          .then(data => {
-            const rawText = data.answer || data.error;
-            const formattedAnswer = formatAndHighlight(rawText);
-            $('#chat_box').append(`<div class="ai-msg">${formattedAnswer}</div>`);
-            $('#chat_box').scrollTop($('#chat_box')[0].scrollHeight);
-          })
-          .catch(error => {
-            $('#chat_box').append(`<div class="ai-msg">Error: ${error.message}</div>`);
-          });
-      }
-
-      function formatAndHighlight(text) {
-        const malls = [
-          "Sindh Lucky One Mall", "Punjab Fortress Square", "Punjab Emporium Mall",
-          "Sindh Dolmen Mall Clifton", "Sindh Boulevard Mall"
-        ];
-
-        const lines = text.split('\n').filter(line => line.trim() !== '');
-        const formattedLines = lines.map(line => {
-          // Highlight mall names
-          malls.forEach(mall => {
-            const regex = new RegExp(mall, 'gi');
-            line = line.replace(regex, `<span class="highlight">${mall}</span>`);
-          });
-
-          // Highlight dollar amounts and comma-separated numbers
-          line = line.replace(/\$\d{1,3}(?:,\d{3})*(?:\.\d+)?/g, '<span class="highlight">$&</span>');
-          line = line.replace(/\b\d{1,3}(?:,\d{3})+\b/g, '<span class="highlight">$&</span>');
-
-          return `<li>${line}</li>`;
-        });
-
-        return `<ul style="padding-left: 20px; margin: 0;">${formattedLines.join('')}</ul>`;
+    // Chat UI events
+    $('#send_button').on('click', sendMessage);
+    $('#user_input').keypress(function (e) {
+      if (e.which === 13 && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
       }
     });
-  </script>
+  }).catch(err => console.error('Initialization error:', err));
+});
+
+// Fetch data from all worksheets
+async function fetchAllWorksheetData(worksheets) {
+  return Promise.all(worksheets.map(ws =>
+    ws.getSummaryDataAsync().then(tbl => ({
+      worksheet: ws.name,
+      columns: tbl.columns.map(c => c.fieldName),
+      data: tbl.data.map(r => r.map(c => c.formattedValue))
+    }))
+  ));
+}
+
+
+
+async function sendDataToAPI() {
+  try {
+    const payload = { dashboard: dashboardName, data: worksheetData };
+    const res = await fetch("https://final-7wmf.onrender.com/api/store_data", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (res.ok) {
+      console.log("✅ Data sent to API");
+    } else {
+      console.error("❌ API error:", res.status);
+    }
+  } catch (err) {
+    console.error("❌ sendDataToAPI failed:", err);
+  }
+}
+
+
+
+$('#narrativeBtn').on('click', generateNarrative);
+
+
+
+
+// Ask your Flask API for a narrative summary
+async function generateNarrative() {
+  if (!dashboardName || !worksheetData) return;
+  try {
+    const res = await fetch("https://final-7wmf.onrender.com/api/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        dashboard: dashboardName,
+        question: "Provide a summary narrative of the current dashboard data."
+      })
+    });
+    const data = await res.json();
+    const text = data.answer || data.error || "No narrative generated.";
+    appendAIMessage(text);
+  } catch (err) {
+    console.error("❌ generateNarrative failed:", err);
+    appendAIMessage(`Error: ${err.message}`);
+  }
+}
+
+// Send user-typed question and display response
+function sendMessage() {
+  const q = $('#user_input').val().trim();
+  if (!q || !dashboardName) return;
+  appendUserMessage(q);
+  $('#user_input').val('');
+  fetch("https://final-7wmf.onrender.com/api/ask", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ dashboard: dashboardName, question: q })
+  })
+  .then(res => res.json())
+  .then(data => appendAIMessage(data.answer || data.error))
+  .catch(err => appendAIMessage(`Error: ${err.message}`));
+}
+
+// Register filter-change listeners for all worksheets
+function registerFilterListeners() {
+  const dash = tableau.extensions.dashboardContent.dashboard;
+  unregisterHandlerFunctions.forEach(fn => fn());
+  unregisterHandlerFunctions.length = 0;
+
+  dash.worksheets.forEach(ws => {
+    const unregister = ws.addEventListener(tableau.TableauEventType.FilterChanged, async () => {
+      worksheetData = await fetchAllWorksheetData(dash.worksheets);
+      await sendDataToAPI();
+    });
+    unregisterHandlerFunctions.push(unregister);
+  });
+}
+
+// UI: Append user message
+function appendUserMessage(text) {
+  $('#chat_box').append(`<div class="user-msg">${escapeHtml(text)}</div>`);
+  $('#chat_box').scrollTop($('#chat_box')[0].scrollHeight);
+}
+
+// UI: Append AI message with highlighting
+function appendAIMessage(rawText) {
+  const formatted = formatAndHighlight(rawText || "");
+  $('#chat_box').append(`<div class="ai-msg">${formatted}</div>`);
+  $('#chat_box').scrollTop($('#chat_box')[0].scrollHeight);
+}
+
+// Escape HTML to avoid injection
+function escapeHtml(s) {
+  return $('<div>').text(s).html();
+}
+
+// Format text with list bullets and highlights
+function formatAndHighlight(text) {
+  const malls = [
+    "Sindh Lucky One Mall", "Punjab Fortress Square", "Punjab Emporium Mall",
+    "Sindh Dolmen Mall Clifton", "Sindh Boulevard Mall"
+  ];
+  const lines = text.split('\n').filter(l => l.trim());
+  const items = lines.map(line => {
+    malls.forEach(mall => {
+      const re = new RegExp(mall, 'gi');
+      line = line.replace(re, `<span class="highlight">${mall}</span>`);
+    });
+    line = line.replace(/\$\d{1,3}(?:,\d{3})*(?:\.\d+)?/g, '<span class="highlight">$&</span>');
+    line = line.replace(/\b\d{1,3}(?:,\d{3})+\b/g, '<span class="highlight">$&</span>');
+    return `<li>${line}</li>`;
+  }).join('');
+  return `<ul style="padding-left:20px;margin:0;">${items}</ul>`;
+}
+</script>
 </body>
 </html>
